@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [{name = "lessonlock contributors"}]
 dependencies = ["PyYAML>=6.0.1"]
-keywords = ["ai", "coding-agent", "claude-code", "guardrails", "hooks", "developer-tools"]
+keywords = ["ai", "coding-agent", "claude-code", "codex", "openai-codex", "guardrails", "hooks", "developer-tools"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",

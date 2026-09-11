@@ -12,6 +12,46 @@ def test_protected_path_denies():
     assert evaluate_guard(guard, event, CWD).action == "deny"
 
 
+def test_codex_apply_patch_protected_path_denies():
+    guard = {"id": "g", "kind": "protected_path", "paths": ["migrations/generated/**"]}
+    patch = """*** Begin Patch
+*** Update File: migrations/generated/1.sql
+@@
+-old
++new
+*** End Patch
+"""
+    event = {"tool_name": "apply_patch", "tool_input": {"command": patch}}
+    assert evaluate_guard(guard, event, CWD).action == "deny"
+
+
+def test_codex_apply_patch_checks_move_destination():
+    guard = {"id": "g", "kind": "protected_path", "paths": ["migrations/generated/**"]}
+    patch = """*** Begin Patch
+*** Update File: migrations/source.sql
+*** Move to: migrations/generated/1.sql
+@@
+-old
++new
+*** End Patch
+"""
+    event = {"tool_name": "apply_patch", "tool_input": {"command": patch}}
+    assert evaluate_guard(guard, event, CWD).action == "deny"
+
+
+def test_codex_apply_patch_unrelated_path_is_not_denied():
+    guard = {"id": "g", "kind": "protected_path", "paths": ["migrations/generated/**"]}
+    patch = """*** Begin Patch
+*** Update File: src/app.py
+@@
+-old
++new
+*** End Patch
+"""
+    event = {"tool_name": "apply_patch", "tool_input": {"command": patch}}
+    assert evaluate_guard(guard, event, CWD) is None
+
+
 def test_command_deny_denies():
     guard = {"id": "g", "kind": "command_deny", "patterns": [r"rm\s+-rf"]}
     event = {"tool_name": "Bash", "tool_input": {"command": "rm -rf build"}}

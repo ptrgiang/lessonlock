@@ -4,6 +4,8 @@
 
 `lessonlock` turns explicit corrections you give a coding agent into deterministic, reviewable guardrails — then generates a regression probe proving the mistake is blocked.
 
+Works with **Claude Code** and **OpenAI Codex** using one shared guard format and runtime.
+
 ```text
 Human correction → executable guard → regression probe → proof
 ```
@@ -16,7 +18,7 @@ No model call at enforcement time. No server. No database. Guards live in Git.
 pip install -e .
 lessonlock init
 lessonlock learn 'Never edit `migrations/generated/**` again.' --id no-generated-migrations
-lessonlock install claude
+lessonlock install all
 lessonlock probe no-generated-migrations
 ```
 
@@ -38,7 +40,7 @@ Actual                DENY
 ✓ Guard works
 ```
 
-Later, when Claude Code tries to edit that path, its `PreToolUse` call is denied before the edit executes.
+Later, if Claude Code uses `Edit`/`Write` or Codex uses `apply_patch` against that path, its `PreToolUse` call is denied before the edit executes.
 
 ## Why this exists
 
@@ -50,7 +52,7 @@ Coding agents can remember a rule and still violate it later. A correction such 
 
 | Correction pattern | Guard | What happens |
 |---|---|---|
-| `Never edit \`path/**\`` | `protected_path` | Blocks `Edit` / `Write` |
+| `Never edit \`path/**\`` | `protected_path` | Blocks Claude `Edit`/`Write` and Codex `apply_patch` |
 | `Never run \`command\`` | `command_deny` | Blocks matching shell commands |
 | `Use \`uv pip\` instead of \`pip\`` | `command_rewrite` | Rewrites the shell tool input |
 | `Never commit directly to branch \`main\`` | `branch_guard` | Blocks commit/push on protected branches |
@@ -76,6 +78,8 @@ lessonlock why GUARD_ID
 lessonlock probe GUARD_ID
 lessonlock probe --all
 lessonlock install claude
+lessonlock install codex
+lessonlock install all
 ```
 
 `lessonlock why` is the scar receipt: it shows the human correction and when the guard was learned.
@@ -98,27 +102,53 @@ source:
 
 They are plain YAML so teams can review them like code.
 
-## Claude Code adapter
+## Agent adapters
 
-`lessonlock install claude` merges a project-level `PreToolUse` hook into `.claude/settings.json` and listens to `Bash|PowerShell|Edit|Write` so Windows-native Claude Code sessions are covered too.
+### Claude Code
 
-The runtime returns Claude Code's structured `PreToolUse` decision output. A denied action is blocked before execution; a rewrite returns the complete updated tool input.
+```bash
+lessonlock install claude
+```
+
+This merges a project-level `PreToolUse` hook into `.claude/settings.json` and listens to `Bash|PowerShell|Edit|Write`, including Windows-native PowerShell sessions.
+
+### OpenAI Codex
+
+```bash
+lessonlock install codex
+```
+
+This merges a project-level `PreToolUse` hook into `.codex/hooks.json`. Codex exposes shell calls as `Bash` and native file edits as `apply_patch`; lessonlock parses the patch targets before allowing the tool call.
+
+Codex may ask you to review/trust a newly added project hook on startup. That trust step is intentionally not bypassed by lessonlock.
+
+### Both
+
+```bash
+lessonlock install all
+```
+
+Claude Code and Codex use the same `.lessonlock/guards/*.yml` files, so a correction becomes one portable project policy instead of two agent-specific rules.
+
+The runtime emits the structured `PreToolUse` decision format understood by both adapters. A denied action is blocked before execution; a rewrite returns the complete updated tool input.
 
 ## Design rules
 
 - deterministic runtime; no LLM required to enforce a guard
+- one correction, one guard format across supported agents
 - default to advisory when a correction cannot be compiled safely
 - one guard = one reviewable file
 - every supported guard kind must have a probe
 - project-local by default
+- never silently bypass an agent's hook-trust mechanism
 - fail small: lessonlock should not become another agent framework
 
 ## Roadmap
 
-- **v0.1** — Claude Code, 5 guard kinds, `learn/list/why/probe`
-- **v0.2** — detect explicit corrections from Claude Code transcripts (`learn --last`)
-- **v0.3** — Codex adapter
-- **v0.4** — Gemini CLI / OpenCode adapters
+- **v0.1** — Claude Code + Codex, 5 guard kinds, `learn/list/why/probe`
+- **v0.2** — detect explicit corrections from agent transcripts (`learn --last`)
+- **v0.3** — Gemini CLI / OpenCode adapters
+- **v0.4** — richer shell-write/path enforcement and hook diagnostics
 - **v0.5** — team lesson sharing and richer Git review metadata
 - **v0.6** — repeated-correction suggestions
 - **v0.7** — prevented-mistake metrics
