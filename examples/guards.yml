@@ -1,0 +1,16 @@
+# Example guards. lessonlock writes one file per learned correction under .lessonlock/guards/.
+- version: 1
+  id: no-generated-migrations
+  kind: protected_path
+  enabled: true
+  paths:
+    - migrations/generated/**
+  message: Never edit generated migrations directly.
+
+- version: 1
+  id: no-rm-rf
+  kind: command_deny
+  enabled: true
+  patterns:
+    - 'rm\s+-rf'
+  message: Destructive recursive delete is blocked.
