@@ -5,20 +5,21 @@ from pathlib import Path
 
 
 HOOK_COMMAND = "lessonlock hook pre-tool-use"
+CLAUDE_MATCHER = "Bash|PowerShell|Edit|Write"
+CODEX_MATCHER = r"^(Bash|Edit|Write|apply_patch)$"
 
 
-def install_claude(root: Path) -> tuple[Path, bool]:
-    settings_path = root / ".claude" / "settings.json"
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    if settings_path.exists():
-        data = json.loads(settings_path.read_text(encoding="utf-8"))
+def _install_pre_tool_use_hook(path: Path, matcher: str) -> tuple[Path, bool]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        data = json.loads(path.read_text(encoding="utf-8"))
     else:
         data = {}
 
     hooks = data.setdefault("hooks", {})
     pre = hooks.setdefault("PreToolUse", [])
     entry = {
-        "matcher": "Bash|PowerShell|Edit|Write",
+        "matcher": matcher,
         "hooks": [{"type": "command", "command": HOOK_COMMAND, "timeout": 180}],
     }
 
@@ -33,5 +34,13 @@ def install_claude(root: Path) -> tuple[Path, bool]:
     if not exists:
         pre.append(entry)
 
-    settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    return settings_path, not exists
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return path, not exists
+
+
+def install_claude(root: Path) -> tuple[Path, bool]:
+    return _install_pre_tool_use_hook(root / ".claude" / "settings.json", CLAUDE_MATCHER)
+
+
+def install_codex(root: Path) -> tuple[Path, bool]:
+    return _install_pre_tool_use_hook(root / ".codex" / "hooks.json", CODEX_MATCHER)
