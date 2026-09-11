@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import sys
 
-from .adapters import install_claude
+from .adapters import install_claude, install_codex
 from .compiler import compile_correction
 from .guards import dump_guard, evaluate_all, load_guards
 from .probe import probe_guard
@@ -103,11 +103,18 @@ def cmd_probe(args: argparse.Namespace) -> int:
 
 
 def cmd_install(args: argparse.Namespace) -> int:
-    if args.agent != "claude":
-        print("V0.1 supports Claude Code only.", file=sys.stderr)
-        return 2
-    path, changed = install_claude(_root())
-    print(f"{'✓ Installed' if changed else '✓ Already installed'} Claude Code hook in {path}")
+    installers = {
+        "claude": ("Claude Code", install_claude),
+        "codex": ("Codex", install_codex),
+    }
+    targets = list(installers) if args.agent == "all" else [args.agent]
+
+    for target in targets:
+        label, installer = installers[target]
+        path, changed = installer(_root())
+        print(f"{'✓ Installed' if changed else '✓ Already installed'} {label} hook in {path}")
+        if target == "codex" and changed:
+            print("  Codex may ask you to review/trust this project hook on next startup.")
     return 0
 
 
@@ -165,7 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_probe)
 
     p = sub.add_parser("install", help="Install an agent adapter")
-    p.add_argument("agent", choices=["claude"])
+    p.add_argument("agent", choices=["claude", "codex", "all"])
     p.set_defaults(func=cmd_install)
 
     p = sub.add_parser("hook", help=argparse.SUPPRESS)
