@@ -52,6 +52,19 @@ def _path_matches(file_path: str, patterns: Iterable[str], cwd: Path) -> bool:
     return any(_matches_any(candidate, patterns) for candidate in candidates)
 
 
+def _apply_patch_paths(command: str) -> list[str]:
+    paths: list[str] = []
+    for line in command.splitlines():
+        match = re.match(r"^\*\*\*\s+(?:Update|Add|Delete) File:\s*(.+?)\s*$", line)
+        if not match:
+            match = re.match(r"^\*\*\*\s+Move to:\s*(.+?)\s*$", line)
+        if match:
+            path = match.group(1).strip().strip('"').strip("'")
+            if path:
+                paths.append(path)
+    return paths
+
+
 def _regex_any(value: str, patterns: Iterable[str]) -> bool:
     return any(re.search(p, value, re.IGNORECASE) for p in patterns)
 
@@ -110,11 +123,19 @@ def evaluate_guard(
     message = guard.get("message") or f"Blocked by lessonlock guard '{guard_id}'."
 
     if kind == "protected_path":
-        if tool not in {"Edit", "Write"}:
-            return None
-        file_path = str(tool_input.get("file_path") or tool_input.get("path") or "")
         patterns = guard.get("paths", [])
-        if file_path and _path_matches(file_path, patterns, cwd):
+        file_paths: list[str] = []
+        if tool in {"Edit", "Write"}:
+            file_path = str(tool_input.get("file_path") or tool_input.get("path") or "")
+            if file_path:
+                file_paths.append(file_path)
+        elif tool == "apply_patch":
+            command = str(tool_input.get("command") or "")
+            file_paths.extend(_apply_patch_paths(command))
+        else:
+            return None
+
+        if any(_path_matches(file_path, patterns, cwd) for file_path in file_paths):
             return Decision("deny", message, guard_id=guard_id)
 
     elif kind == "command_deny":
